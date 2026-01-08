@@ -1,0 +1,1232 @@
+---
+title: "Pitch Classification With Tidymodels"
+author: 
+  name: "Austin Moellers"
+  email: "AustinMoellers@outlook.com"
+date: "2026/01/08"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    number-sections: false
+    smooth-scroll: true
+    code-copy: false
+knitr:
+  opts_chunk: 
+    echo: false
+    warning: false
+    message: false
+    out-width: 100%
+execute: 
+  cache: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+set.seed(162)
+
+library(broom)
+library(knitr)
+library(GGally)
+library(ggforce)
+library(janitor)
+library(ggthemes)
+library(tidyverse)
+library(tidymodels)
+library(kableExtra)
+```
+
+```{r}
+sc_2025 <- read_rds("statcast_2025.rds")
+```
+
+**WORK IN PROGRESS**
+
+# Introduction
+
+My favourite thing to do while watching a baseball game (other than stuffing my face) is guessing the type of pitch after it's been thrown. It may sound weird, but I can't be the only one, since Baseball Savant has their own dedicated game called ["Guess the Pitch Type"](https://baseballsavant.mlb.com/games/pitch-type-guess) (My best score is 18 out of 20). I've always found it interesting how a broadcast can instantly display the type of pitch and wondered what information and modeling algorithms they're using to make this prediction. In this publication I'm going to investigate just that.
+
+# Exploratory Analysis
+
+## Overview
+
+Here is a quick look at the quantitative variables of interest. The following table displays the median values of the variables of interest for each pitch type listed in the 2025 statcast data.
+
+```{r}
+sc_2025 |>
+  select(
+    pitch_name,
+    release_speed,
+    ax,
+    az,
+    release_spin_rate,
+    spin_axis,
+    arm_angle
+  ) |>
+  drop_na() |>
+  group_by(pitch_name) |>
+  summarize(across(where(is.numeric), \(x) median(x, na.rm = TRUE))) |>
+  arrange(-release_speed) |>
+  kable() |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+**Below is a brief introduction to these variables:**
+
+`pitch_name` : The name of the pitch derived from the Statcast Data.
+
+`release_speed` : Pitch velocity out-of-hand.
+
+`ax` : The acceleration of the pitch, in feet per second per second, in x-dimension, determined at y = 50 feet.
+
+`az` : The acceleration of the pitch, in feet per second per second, in z-dimension, determined at y = 50 feet.
+
+`release_spin_rate` : Spin rate of pitch tracked by Statcast.
+
+`spin_axis` : The Spin Axis in the 2D X-Z plane in degrees from 0 to 360, such that 180 represents a pure backspin fastball and 0 degrees represents a pure topspin (12-6) curveball.
+
+`arm_angle` : ...
+
+Here is a pairs plot for the 2025 xFIP leader [Garrett Crochet](https://www.baseball-reference.com/players/c/crochga01.shtml). Several variables allow us to easily separate Crochet's pitches, especially `release speed` and `ax` (see the plot in row 1, column 2).
+
+```{r}
+#| label: fig-pairs
+#| fig-cap: "Scatterplot Matrix of Garrett Crochet's Pitches (2025 Season)"
+
+sc_2025 |>
+  filter(pitcher_name == "Crochet, Garrett") |>
+  select(
+    pitch_name,
+    release_speed,
+    ax,
+    az,
+    release_spin_rate,
+    spin_axis,
+    arm_angle
+  ) |>
+  drop_na() |>
+  ggpairs(
+    aes(colour = pitch_name, alpha = 0.25),
+    columns = 2:7,
+    upper = list(continuous = wrap("points", size = 1, alpha = 0.25)),
+    lower = list(continuous = wrap("points", size = 1, alpha = 0.25)),
+    axisLabels = "none"
+  ) +
+  scale_colour_brewer(palette = "Set1")
+```
+
+## `release_speed`
+
+Release speed (or velocity) does a great job of separating between fastballs, breaking balls, and off-speed pitches. In the plot below there is a clear drop off in velocity between the fastballs and off-speed/breaking pitches. Other variables are required to distinguish between different types of fastballs, as well as between the off-speed and breaking pitches.
+
+```{r}
+#| label: fig-release-speed
+#| fig-cap: "Boxplots of Release Speeds for MLB Pitches - 2025 Season (Minimum 100 Pitches)"
+
+sc_2025 |>
+  filter(!(pitch_name %in% c("Pitch Out", "Other", "Screwball"))) |>
+  select(pitch_name, release_speed) |>
+  drop_na() |>
+  mutate(pitch_group = case_match(
+    pitch_name,
+    c("4-Seam Fastball", "Sinker", "Cutter") ~ "Fastball",
+    c("Changeup", "Split-Finger", "Forkball") ~ "Off-speed",
+    c("Curveball", "Knuckle Curve", "Slider", "Sweeper", "Slurve", "Knuckleball", "Slow Curve") ~ "Breaking",
+    c("Eephus") ~ "Other"
+  )) |>
+  ggplot(aes(x = reorder(pitch_name, -release_speed), y = release_speed, fill = pitch_group)) +
+  geom_boxplot() +
+  scale_fill_brewer(
+    palette = "Set1",
+    breaks = c("Fastball", "Off-speed", "Breaking", "Other")
+  ) +
+  labs(
+    x = "Pitch Name",
+    y = "Release Speed",
+    fill = "Pitch Group"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.35, hjust = 1),
+    legend.position = "bottom"
+  )
+```
+
+## `ax & az`
+
+Acceleration speeds do a great job of separating pitches with similar release speeds. The following plot is of the horizontal and vertical acceleration speeds for [Chris Sale](https://www.baseball-reference.com/players/s/salech01.shtml)'s 2025 pitches, notice how the slider and changeup are easily distinguished, as well as the 4-seam fastball and sinker.
+
+```{r}
+#| label: fig-acceleration
+#| fig-cap: "Scatterplot of Acceleration Speeds - Chris Sale (2025 Season)"
+
+sc_2025 |>
+  filter(
+    pitcher_name == "Sale, Chris",
+    !(pitch_name %in% c("Pitch Out", "Other", "Screwball"))
+  ) |>
+  select(pitch_name, ax, az) |>
+  drop_na() |>
+  ggplot(aes(x = ax, y = az, colour = pitch_name)) +
+  geom_point(alpha = 0.25) +
+  stat_ellipse(level = 0.95) +
+  scale_colour_brewer(palette = "Set1") +
+  labs(
+    title = "Scatter Plot of Acceleration Speeds",
+    subtitle = "Chris Sale (2025)",
+    x = "Feet / Second",
+    y = "Feet / Second",
+    colour = "Pitch Name"
+  ) +
+  theme(legend.position = "bottom") +
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+```
+
+## `release_spin_rate`
+
+Release spin rate also does a great job of separating between fastballs, breaking balls, and off-speed pitches. In the plot below there is a large drop between the off-speed pitches and other pitch groups.
+
+```{r}
+#| label: fig-spin_rate
+#| fig-cap: "Boxplots of Spin Rates for MLB Pitches - 2025 Season (Minimum 100 Pitches)"
+
+sc_2025 |>
+  filter(!(pitch_name %in% c("Pitch Out", "Other", "Screwball"))) |>
+  select(pitch_name, release_spin_rate) |>
+  drop_na() |>
+  mutate(pitch_group = case_match(
+    pitch_name,
+    c("4-Seam Fastball", "Sinker", "Cutter") ~ "Fastball",
+    c("Changeup", "Split-Finger", "Forkball") ~ "Off-speed",
+    c("Curveball", "Knuckle Curve", "Slider", "Sweeper", "Slurve", "Knuckleball", "Slow Curve") ~ "Breaking",
+    c("Eephus") ~ "Other"
+  )) |>
+  ggplot(aes(x = reorder(pitch_name, -release_spin_rate), y = release_spin_rate, fill = pitch_group)) +
+  geom_boxplot() +
+  scale_fill_brewer(
+    palette = "Set1",
+    breaks = c("Fastball", "Off-speed", "Breaking", "Other")
+  ) +
+  labs(
+    x = "Pitch Name",
+    y = "Spin Rate",
+    fill = "Pitch Group"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.35, hjust = 1),
+    legend.position = "bottom"
+  )
+```
+
+The spin rate of a pitch is generally positively correlated with it's release speed (the exception being the knuckle curve), but each pitch type has a different slope. Using the 4-seam fastball as our baseline, every pitch has a significantly different slope, and every pitch except the sweeper has a significantly different intercept. The release speed and pitch type explain approximately 62% of the variance in spin rate.
+
+```{r}
+speed_spin <- sc_2025 |>
+  filter(pitch_name %in% c(
+    "4-Seam Fastball", "Changeup", "Curveball", "Cutter",
+    "Knuckle Curve", "Sinker", "Slider", "Split-Finger", "Sweeper"
+  )) |>
+  select(pitch_name, release_speed, release_spin_rate) |>
+  mutate(across(pitch_name, as_factor)) |>
+  drop_na()
+
+speed_spin_lm <- lm(release_spin_rate ~ release_speed * pitch_name, data = speed_spin)
+
+tidy(speed_spin_lm) |>
+  kable(caption = "Linear Regression Coefficients for Spin Rate ~ Speed") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+
+glance(speed_spin_lm) |>
+  kable(caption = "Measures of Model Fit for Spin Rate ~ Speed") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+The next plot shows the correlation between release speed and spin rate. Most pitches display a positive correlation, where as others (like the knuckle curve) have a negative correlations, and some (like the slider) have almost no correlation.
+
+```{r}
+#| label: fig-spin_rate-2
+#| fig-cap: "Boxplots of Spin Rates for MLB Pitches - 2025 Season (Minimum 100 Pitches)"
+
+sc_2025 |>
+  filter(pitch_name %in% c(
+    "4-Seam Fastball", "Changeup", "Curveball", "Cutter",
+    "Knuckle Curve", "Sinker", "Slider", "Split-Finger", "Sweeper"
+  )) |>
+  select(pitch_name, release_speed, release_spin_rate) |>
+  drop_na() |>
+  group_by(pitch_name) |>
+  slice_sample(n = 500) |>
+  ggplot(aes(x = release_speed, y = release_spin_rate)) +
+  geom_point(alpha = 0.25) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~pitch_name, scales = "free") +
+  labs(
+    x = "Release Speed",
+    y = "Release Spin Rate"
+  )
+```
+
+## `spin_axis`
+
+Since the spin axis is a radial feature, It will need to be converted into two separate variables using sine and cosine.
+
+```{r}
+sc_2025 <- sc_2025 |>
+  mutate(
+    spin_axis_x = sin((2 * pi * spin_axis) / 360),
+    spin_axis_z = cos((2 * pi * spin_axis) / 360)
+  )
+```
+
+Spin axis does a great job of separating pitches with similar release speeds. In the plot below, the slider and changeup are easily distinguished, as well as the 4-seam fastball and sinker.
+
+```{r}
+#| label: fig-spin-axis
+#| fig-subcap:
+#|   - "Radial Plot of Pitch Axis Vs. Z-Dimension Acceleration - Chris Sale (2025)"
+#|   - "Scatterplot of Spin Axis, X vs. Z direction - Random sample of 5000 pitches (2025)"
+#| layout-ncol: 2
+
+
+sc_2025 |>
+  filter(pitcher_name == "Sale, Chris") |>
+  select(spin_axis, az, pitch_name) |>
+  drop_na() |>
+  ggplot(aes(x = spin_axis, y = az, colour = pitch_name)) +
+  geom_point(alpha = 0.25) +
+  scale_x_continuous(
+    expand = expansion(0, 0),
+    limits = c(0, 360),
+    breaks = 0:3 * 90
+  ) +
+  scale_y_continuous(expand = expansion(c(0, 0.05))) +
+  coord_radial() +
+  scale_colour_brewer(palette = "Set1") +
+  labs(
+    x = "Degrees",
+    y = "Feet / Second",
+    colour = "Pitch Name"
+  ) +
+  theme(legend.position = "bottom") +
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+
+sc_2025 |>
+  select(pitch_name, spin_axis_x, spin_axis_z) |>
+  drop_na() |>
+  slice_sample(n = 5000) |>
+  mutate(pitch_group = case_match(
+    pitch_name,
+    c("4-Seam Fastball", "Sinker", "Cutter") ~ "Fastball",
+    c("Changeup", "Split-Finger", "Forkball") ~ "Off-speed",
+    c("Curveball", "Knuckle Curve", "Slider", "Sweeper", "Slurve", "Knuckleball", "Slow Curve") ~ "Breaking",
+    .default = "Other"
+  )) |>
+  ggplot(aes(x = spin_axis_x, y = spin_axis_z, colour = pitch_group)) +
+  geom_point(size = 2) +
+  scale_colour_brewer(palette = "Set1") +
+  coord_equal() +
+  labs(
+    x = "Spin Axis (x-direction)",
+    y = "Spin Axis (z-direction)",
+    colour = "Pitch Group"
+  ) +
+  theme(legend.position = "bottom")
+```
+
+# Pitchers
+
+I have elected to run my models on the Statcast data from three pitchers: 2025 NL Cy Young runner-up [Cristopher Sánchez](https://www.baseball-reference.com/players/s/sanchcr01.shtml), 2025 AL Cy Young winner [Tarik Skubal](https://www.baseball-reference.com/players/s/skubata01.shtml), and 2025 NL Cy Young winner [Paul Skenes](https://www.baseball-reference.com/players/s/skenepa01.shtml). I chose these three due to the varying number of unique pitches they throw. Sánchez throws just three, where as Skubal and Skenes throw five and Seven, respectively.
+
+```{r}
+ball_circumference <- (9 + 9.25) / 2
+ball_radius <- ball_circumference / (2 * pi)
+r_feet <- ball_radius / 12
+
+sz_left <- -8.5 / 12
+sz_right <- 8.5 / 12
+
+med_sz_top <- median(sc_2025$sz_top, na.rm = TRUE)
+med_sz_bot <- median(sc_2025$sz_bot, na.rm = TRUE)
+
+sz <- ggplot() +
+  geom_rect(
+    aes(
+      xmin = sz_left,
+      xmax = sz_right,
+      ymin = med_sz_bot,
+      ymax = med_sz_top
+    ),
+    alpha = 0, colour = "gray20", linewidth = 1
+  ) +
+  coord_fixed(
+    xlim = c(-2, 2),
+    ylim = c(0, med_sz_top + med_sz_bot)
+  )
+```
+
+## Cristopher Sánchez
+
+::: {.grid}
+
+::: {.g-col-2}
+![Cristopher Sánchez - Source: Baseball Reference](https://www.baseball-reference.com/req/2025011210/images/headshots/1/107b03be_mlbam.jpg)
+:::
+
+::: {.g-col-10}
+Cristopher Sánchez is a Dominican professional MLB pitcher known for his smooth left-handed delivery, heavy sinker, and devastating changeup that generates weak contact and strikeouts. Born on October 25, 1996, in San Juan de la Maguana, Dominican Republic, he was signed by the Philadelphia Phillies as an international free agent in 2013. Sánchez made his major league debut in 2021 and gradually developed into a key piece of the Phillies’ pitching staff. Breakout performances in subsequent seasons established him as one of the most reliable starters in the National League, highlighted by his improved command, ability to induce ground balls, and effectiveness against both right- and left-handed hitters. Widely regarded as one of the top emerging left-handed starters in MLB, Sánchez continues to anchor Philadelphia’s rotation as a frontline arm.
+:::
+
+:::
+
+```{r}
+sanchez_fg <- read_csv("Stats/Sanchez_Stats.csv")
+
+sanchez_fg |>
+  select(-Level, -`LOB%`, -`HR/FB`) |>
+  kable(caption = "Cristopher Sánchez - Career Statistics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+
+sanchez <- sc_2025 |>
+  filter(
+    pitcher_name == "Sánchez, Cristopher",
+    !is.na(release_spin_rate)
+  ) |>
+  mutate(pitch_name = as_factor(pitch_name))
+```
+
+::: {.grid}
+
+::: {.g-col-8}
+```{r}
+#| label: fig-sz-sanchez
+#| fig-cap: "Sample of Cristopher Sánchez's Arsenal (100 Pitches) - Catcher's Perspective"
+
+sz + geom_circle(
+  data = sanchez |>
+    group_by(pitch_name) |>
+    slice_sample(prop = 0.033),
+  alpha = 0.75,
+  aes(
+    x0 = plate_x,
+    y0 = plate_z,
+    r = r_feet,
+    fill = pitch_name
+  )
+) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    x = "Horizontal Position",
+    y = "Vertical Position",
+    fill = "Pitch Name"
+  ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+```
+:::
+
+::: {.g-col-4}
+```{r}
+sanchez |>
+  tabyl(pitch_name) |>
+  arrange(desc(n)) |>
+  adorn_pct_formatting(digits = 1) |>
+  kable(caption = "Cristopher Sánchez - 2025 Pitch Mix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+sanchez |>
+  group_by(pitch_name) |>
+  summarize(across(where(is.numeric), \(x) median(x, na.rm = TRUE))) |>
+  select(pitch_name, release_speed, ax, az, release_spin_rate, spin_axis_x, spin_axis_z) |>
+  arrange(-release_speed) |>
+  kable(caption = "Cristopher Sánchez - 2025 Pitch Attributes (Median)") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+::: {layout-ncol=2}
+{{< video https://sporty-clips.mlb.com/M3k0ejRfWGw0TUFRPT1fQVFWVUFBVlFWbGNBRGxRRlVnQUhDUUpYQUZoV1VWWUFDMVVCQkF0V0FWSlNBRlpW.mp4 >}}
+
+{{< video https://sporty-clips.mlb.com/b0dXa2xfWGw0TUFRPT1fQVZRRlVWY0RYZ29BWEZvQVZ3QUhBdzlUQUZoVEFsTUFBZ0VCVWdWWFUxQlhCd01F.mp4 >}}
+:::
+
+## Tarik Skubal
+
+::: {.grid}
+
+::: {.g-col-2}
+![Tarik Skubal - Source: Baseball Reference](https://www.baseball-reference.com/req/2025011210/images/headshots/1/1e4029ec_mlbam.jpg)
+:::
+
+::: {.g-col-10}
+Tarik Daniel Skubal is an American professional MLB pitcher known for his dominant left-handed arsenal and elite strikeout ability. Born on November 20, 1996, in Haymarket, Virginia, he was drafted by the Detroit Tigers in the ninth round of the 2018 MLB Draft out of Seattle University. Skubal made his major league debut on August 18, 2020, and steadily developed into one of the most reliable starters in baseball. Breakout performances in subsequent seasons established him as the ace of the Tigers’ rotation, highlighted by his overpowering fastball, sharp slider, and improved command. Widely regarded as one of the top left-handed pitchers in MLB, Skubal continues to anchor Detroit’s pitching staff as a frontline starter.
+:::
+
+:::
+
+```{r}
+skubal_fg <- read_csv("Stats/Skubal_Stats.csv")
+
+skubal_fg |>
+  select(-Level, -`LOB%`, -`HR/FB`) |>
+  kable(caption = "Tarik Skubal - Career Statistics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+
+skubal <- sc_2025 |>
+  filter(
+    pitcher_name == "Skubal, Tarik",
+    !is.na(release_spin_rate),
+    pitch_name != "Split-Finger"
+  ) |>
+  mutate(pitch_name = as_factor(pitch_name))
+```
+
+::: {.grid}
+
+::: {.g-col-8}
+```{r}
+#| label: fig-sz-skubal
+#| fig-cap: "Sample of Tarik Skubal's Arsenal (100 Pitches) - Catcher's Perspective"
+
+sz + geom_circle(
+  data = skubal |>
+    group_by(pitch_name) |>
+    slice_sample(prop = 0.0326),
+  alpha = 0.75,
+  aes(
+    x0 = plate_x,
+    y0 = plate_z,
+    r = r_feet,
+    fill = pitch_name
+  )
+) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    x = "Horizontal Position",
+    y = "Vertical Position",
+    fill = "Pitch Name"
+  ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+```
+:::
+
+::: {.g-col-4}
+```{r}
+skubal |>
+  tabyl(pitch_name) |>
+  arrange(desc(n)) |>
+  adorn_pct_formatting(digits = 1) |>
+  kable(caption = "Tarik Skubal - 2025 Pitch Mix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+skubal |>
+  group_by(pitch_name) |>
+  summarize(across(where(is.numeric), \(x) median(x, na.rm = TRUE))) |>
+  select(pitch_name, release_speed, ax, az, release_spin_rate, spin_axis_x, spin_axis_z) |>
+  arrange(-release_speed) |>
+  kable(caption = "Tarik Skubal - 2025 Pitch Attributes (Median)") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+::: {layout-ncol=2}
+{{< video https://sporty-clips.mlb.com/RDFBbk1fV0ZRVkV3dEdEUT09X1YxTlpWRk1EQTFNQVd3RlVBQUFIVkZjRkFBQlVVZ0lBQmwxVUJ3WlVCRlZWVlFWZQ==.mp4 >}}
+
+{{< video https://sporty-clips.mlb.com/QndYN0JfWGw0TUFRPT1fQUFkV0FWRU5YZ29BRGdZRlhnQUhVQUlIQUZsUlZGWUFWd1pUQmdkUUJRQlhVVkVD.mp4 >}}
+:::
+
+## Paul Skenes
+
+::: {.grid}
+
+::: {.g-col-2}
+![Paul Skenes - Source: Baseball Reference](https://www.baseball-reference.com/req/2025011210/images/headshots/2/2e7ed9f9_mlbam.jpg)
+:::
+
+::: {.g-col-10}
+Paul David Skenes is an American professional MLB pitcher known for his overpowering fastball and dominant starting presence. Born on May 29, 2002, in Fullerton, California, he played college baseball at the Air Force Academy before transferring to LSU, where he led the Tigers to the 2023 College World Series title. Skenes was selected first overall by the Pittsburgh Pirates in the 2023 MLB Draft and made his major league debut in 2024. He quickly established himself as one of baseball’s premier young aces, combining elite velocity with a devastating mix of secondary pitches, and continues to anchor the Pirates’ rotation as a frontline starter.
+:::
+
+:::
+
+```{r}
+skenes_fg <- read_csv("Stats/Skenes_Stats.csv")
+
+skenes_fg |>
+  select(-Level, -`LOB%`, -`HR/FB`) |>
+  kable(caption = "Paul Skenes - Career Statistics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+
+skenes <- sc_2025 |>
+  filter(
+    pitcher_name == "Skenes, Paul",
+    !is.na(release_spin_rate)
+  ) |>
+  mutate(pitch_name = as_factor(pitch_name))
+```
+
+::: {.grid}
+
+::: {.g-col-8}
+```{r}
+#| label: fig-sz-skenes
+#| fig-cap: "Sample of Paul Skenes's Arsenal (100 Pitches) - Catcher's Perspective"
+
+sz + geom_circle(
+  data = skenes |>
+    group_by(pitch_name) |>
+    slice_sample(prop = 0.035),
+  alpha = 0.75,
+  aes(
+    x0 = plate_x,
+    y0 = plate_z,
+    r = r_feet,
+    fill = pitch_name
+  )
+) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    x = "Horizontal Position",
+    y = "Vertical Position",
+    fill = "Pitch Name"
+  ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+```
+:::
+
+::: {.g-col-4}
+```{r}
+skenes |>
+  tabyl(pitch_name) |>
+  arrange(desc(n)) |>
+  adorn_pct_formatting(digits = 1) |>
+  kable(caption = "Paul Skenes - 2025 Pitch Mix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+skenes |>
+  group_by(pitch_name) |>
+  summarize(across(where(is.numeric), \(x) median(x, na.rm = TRUE))) |>
+  select(pitch_name, release_speed, ax, az, release_spin_rate, spin_axis_x, spin_axis_z) |>
+  arrange(-release_speed) |>
+  kable(caption = "Paul Skenes - 2025 Pitch Attributes (Median)") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+::: {layout-ncol=2}
+{{< video https://sporty-clips.mlb.com/TkE5eTZfVjBZQUhRPT1fQmxOU1ZsQldWUVVBRHdBRFVRQUhVbE5WQUFCVFVRY0FBbEpRVWxaUlV3RlhDQU1E.mp4 >}}
+
+{{< video https://sporty-clips.mlb.com/MDRXanhfVjBZQUhRPT1fQndaWFVsVldWd1lBQ0ZRTFZnQUhBUVFFQUZsWFVnTUFCMVFBQ1FNRkFnUlFDRllI.mp4 >}}
+:::
+
+# Modeling
+
+```{r}
+#| output: false
+
+sanchez_split <- initial_split(sanchez, strata = pitch_name)
+sanchez_split
+
+sanchez_train <- training(sanchez_split)
+sanchez_test <- testing(sanchez_split)
+
+sanchez_folds <- vfold_cv(sanchez_train, v = 10, strata = pitch_name)
+sanchez_folds
+```
+
+```{r}
+#| output: false
+
+skubal_split <- initial_split(skubal, strata = pitch_name)
+skubal_split
+
+skubal_train <- training(skubal_split)
+skubal_test <- testing(skubal_split)
+
+skubal_folds <- vfold_cv(skubal_train, v = 10, strata = pitch_name)
+skubal_folds
+```
+
+```{r}
+#| output: false
+
+skenes_split <- initial_split(skenes, strata = pitch_name)
+skenes_split
+
+skenes_train <- training(skenes_split)
+skenes_test <- testing(skenes_split)
+
+skenes_folds <- vfold_cv(skenes_train, v = 10, strata = pitch_name)
+skenes_folds
+```
+
+```{r}
+sanchez_base_rec <- recipe(
+  pitch_name ~ release_speed + ax + az + release_spin_rate + spin_axis_x + spin_axis_z + arm_angle,
+  data = sanchez_train
+)
+
+skubal_base_rec <- recipe(
+  pitch_name ~ release_speed + ax + az + release_spin_rate + spin_axis_x + spin_axis_z + arm_angle,
+  data = skubal_train
+)
+
+skenes_base_rec <- recipe(
+  pitch_name ~ release_speed + ax + az + release_spin_rate + spin_axis_x + spin_axis_z + arm_angle,
+  data = skenes_train
+)
+```
+
+## Decision Tree
+
+```{r}
+dt_spec <- decision_tree() |>
+  set_mode("classification") |>
+  set_engine("rpart")
+
+dt_wflow <- workflow() |>
+  add_model(dt_spec)
+```
+
+### Cristopher Sánchez
+
+::: {.grid}
+
+::: {.g-col-6}
+```{r}
+dt_wflow |>
+  add_recipe(sanchez_base_rec) |>
+  fit_resamples(resamples = sanchez_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Cristopher Sánchez - Decision Tree Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-6}
+```{r}
+sanchez_dt_fit <- dt_wflow |>
+  add_recipe(sanchez_base_rec) |>
+  fit(data = sanchez_train)
+
+sanchez_dt_fit |>
+  augment(new_data = sanchez_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Cristopher Sánchez - Decision Tree Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-sanchez-dt
+#| fig-cap: "Decision Tree for Cristopher Sánchez"
+
+sanchez_dt_fit |>
+  extract_fit_engine() |>
+  rpart.plot::rpart.plot(roundint = FALSE)
+```
+
+### Tarik Skubal
+
+::: {.grid}
+
+::: {.g-col-4}
+```{r}
+dt_wflow |>
+  add_recipe(skubal_base_rec) |>
+  fit_resamples(resamples = skubal_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Tarik Skubal - Decision Tree Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-8}
+```{r}
+skubal_dt_fit <- dt_wflow |>
+  add_recipe(skubal_base_rec) |>
+  fit(data = skubal_train)
+
+skubal_dt_fit |>
+  augment(new_data = skubal_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Tarik Skubal - Decision Tree Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-skubal-dt
+#| fig-cap: "Decision Tree for Tarik Skubal"
+
+skubal_dt_fit |>
+  extract_fit_engine() |>
+  rpart.plot::rpart.plot(roundint = FALSE)
+```
+
+### Paul Skenes
+
+::: {.grid}
+
+::: {.g-col-4}
+```{r}
+dt_wflow |>
+  add_recipe(skenes_base_rec) |>
+  fit_resamples(resamples = skenes_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Paul Skenes - Decision Tree Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-8}
+```{r}
+skenes_dt_fit <- dt_wflow |>
+  add_recipe(skenes_base_rec) |>
+  fit(data = skenes_train)
+
+skenes_dt_fit |>
+  augment(new_data = skenes_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Paul Skenes - Decision Tree Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-skenes-dt
+#| fig-cap: "Decision Tree for Paul Skenes"
+
+skenes_dt_fit |>
+  extract_fit_engine() |>
+  rpart.plot::rpart.plot(roundint = FALSE)
+```
+
+## Random Forest
+
+```{r}
+rf_spec <- rand_forest(trees = 1000) |>
+  set_mode("classification") |>
+  set_engine("ranger")
+
+rf_wflow <- workflow() |>
+  add_model(rf_spec)
+```
+
+### Cristopher Sánchez
+
+::: {.grid}
+
+::: {.g-col-6}
+```{r}
+rf_wflow |>
+  add_recipe(sanchez_base_rec) |>
+  fit_resamples(resamples = sanchez_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Cristopher Sánchez - Random Forest Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-6}
+```{r}
+sanchez_rf_fit <- rf_wflow |>
+  add_recipe(sanchez_base_rec) |>
+  fit(data = sanchez_train)
+
+sanchez_rf_fit |>
+  augment(new_data = sanchez_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Cristopher Sánchez - Random Forest Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-sanchez-rf-roc
+#| fig-cap: "ROC Curves for Cristopher Sánchez's Random Forest Model"
+
+sanchez_rf_fit |>
+  augment(new_data = sanchez_test) |>
+  roc_curve(pitch_name, .pred_Sinker:.pred_Slider) |>
+  autoplot()
+```
+
+### Tarik Skubal
+
+::: {.grid}
+
+::: {.g-col-4}
+```{r}
+rf_wflow |>
+  add_recipe(skubal_base_rec) |>
+  fit_resamples(resamples = skubal_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Tarik Skubal - Random Forest Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-8}
+```{r}
+skubal_rf_fit <- rf_wflow |>
+  add_recipe(skubal_base_rec) |>
+  fit(data = skubal_train)
+
+skubal_rf_fit |>
+  augment(new_data = skubal_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Tarik Skubal - Random Forest Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-skubal-rf-roc
+#| fig-cap: "ROC Curves for Tarik Skubal's Random Forest Model"
+
+skubal_rf_fit |>
+  augment(new_data = skubal_test) |>
+  roc_curve(pitch_name, `.pred_4-Seam Fastball`:.pred_Curveball) |>
+  autoplot()
+```
+
+```{r}
+skubal_rf_fit |>
+  augment(new_data = skubal_test) |>
+  filter(.pred_class != pitch_name) |>
+  select(pitch_name, .pred_class, 2:6) |>
+  arrange(pitch_name, .pred_class) |> 
+  kable() |> 
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+
+### Paul Skenes
+
+::: {.grid}
+
+::: {.g-col-4}
+```{r}
+rf_wflow |>
+  add_recipe(skenes_base_rec) |>
+  fit_resamples(resamples = skenes_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Paul Skenes - Random Forest Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-8}
+```{r}
+skenes_rf_fit <- rf_wflow |>
+  add_recipe(skenes_base_rec) |>
+  fit(data = skenes_train)
+
+skenes_rf_fit |>
+  augment(new_data = skenes_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Paul Skenes - Random Forest Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-skenes-rf-roc
+#| fig-cap: "ROC Curves for Paul Skenes's Random Forest Model"
+
+skenes_rf_fit |>
+  augment(new_data = skenes_test) |>
+  roc_curve(pitch_name, `.pred_4-Seam Fastball`:.pred_Curveball) |>
+  autoplot()
+```
+
+```{r}
+skenes_rf_fit |>
+  augment(new_data = skenes_test) |>
+  filter(.pred_class != pitch_name) |>
+  select(pitch_name, .pred_class, 2:8) |>
+  arrange(pitch_name, .pred_class) |> 
+  kable() |> 
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+## K-Nearest Neighbors (KNN)
+
+```{r}
+sanchez_scaled_rec <- sanchez_base_rec |>
+  step_scale(all_predictors()) |>
+  step_center(all_predictors())
+
+skubal_scaled_rec <- skubal_base_rec |>
+  step_scale(all_predictors()) |>
+  step_center(all_predictors())
+
+skenes_scaled_rec <- skenes_base_rec |>
+  step_scale(all_predictors()) |>
+  step_center(all_predictors())
+```
+
+```{r}
+knn_spec <- nearest_neighbor(neighbors = 13, weight_func = "triangular") |>
+  set_mode("classification") |>
+  set_engine("kknn")
+
+knn_wflow <- workflow() |>
+  add_model(knn_spec)
+```
+
+### Cristopher Sánchez
+
+::: {.grid}
+
+::: {.g-col-6}
+```{r}
+knn_wflow |>
+  add_recipe(sanchez_scaled_rec) |>
+  fit_resamples(resamples = sanchez_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Cristopher Sánchez - K-Nearest Neighbors Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-6}
+```{r}
+sanchez_knn_fit <- knn_wflow |>
+  add_recipe(sanchez_scaled_rec) |>
+  fit(data = sanchez_train)
+
+sanchez_knn_fit |>
+  augment(new_data = sanchez_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Cristopher Sánchez - K-Nearest Neighbors Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-sanchez-knn-roc
+#| fig-cap: "ROC Curves for Cristopher Sánchez's K-Nearest Neighbors Model"
+
+sanchez_knn_fit |>
+  augment(new_data = sanchez_test) |>
+  roc_curve(pitch_name, .pred_Sinker:.pred_Slider) |>
+  autoplot()
+```
+
+### Tarik Skubal
+
+::: {.grid}
+
+::: {.g-col-4}
+```{r}
+knn_wflow |>
+  add_recipe(skubal_scaled_rec) |>
+  fit_resamples(resamples = skubal_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Tarik Skubal - K-Nearest Neighbors Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-8}
+```{r}
+skubal_knn_fit <- knn_wflow |>
+  add_recipe(skubal_scaled_rec) |>
+  fit(data = skubal_train)
+
+skubal_knn_fit |>
+  augment(new_data = skubal_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Tarik Skubal - K-Nearest Neighbors Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-skubal-knn-roc
+#| fig-cap: "ROC Curves for Tarik Skubal's K-Nearest Neighbors Model"
+
+skubal_knn_fit |>
+  augment(new_data = skubal_test) |>
+  roc_curve(pitch_name, `.pred_4-Seam Fastball`:.pred_Curveball) |>
+  autoplot()
+```
+
+```{r}
+skubal_knn_fit |>
+  augment(new_data = skubal_test) |>
+  filter(.pred_class != pitch_name) |>
+  select(pitch_name, .pred_class, 2:6) |>
+  arrange(pitch_name, .pred_class) |> 
+  kable() |> 
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+### Paul Skenes
+
+::: {.grid}
+
+::: {.g-col-4}
+```{r}
+knn_wflow |>
+  add_recipe(skenes_scaled_rec) |>
+  fit_resamples(resamples = skenes_folds) |>
+  collect_metrics() |>
+  select(-c(.estimator, .config)) |>
+  kable(caption = "Paul Skenes - K-Nearest Neighbors Performance Metrics") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+::: {.g-col-8}
+```{r}
+skenes_knn_fit <- knn_wflow |>
+  add_recipe(skenes_scaled_rec) |>
+  fit(data = skenes_train)
+
+skenes_knn_fit |>
+  augment(new_data = skenes_test) |>
+  conf_mat(pitch_name, .pred_class) |>
+  _$table |>
+  kable(caption = "Paul Skenes - K-Nearest Neighbors Confusion Matrix") |>
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+:::
+
+:::
+
+```{r}
+#| label: fig-skenes-knn-roc
+#| fig-cap: "ROC Curves for Paul Skenes's K-Nearest Neighbors Model"
+
+skenes_knn_fit |>
+  augment(new_data = skenes_test) |>
+  roc_curve(pitch_name, `.pred_4-Seam Fastball`:.pred_Curveball) |>
+  autoplot()
+```
+
+```{r}
+skenes_knn_fit |>
+  augment(new_data = skenes_test) |>
+  filter(.pred_class != pitch_name) |>
+  select(pitch_name, .pred_class, 2:8) |>
+  arrange(pitch_name, .pred_class) |>
+  print(n = Inf) |> 
+  kable() |> 
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+```
+
+## Comparison
+
+### Cristopher Sánchez
+
+```{r}
+sanchez_wf_set <- workflow_set(
+  list(sanchez_base_rec, sanchez_base_rec, sanchez_scaled_rec),
+  list(dt_spec, rf_spec, knn_spec),
+  cross = FALSE
+)
+
+sanchez_rs <- workflow_map(
+  sanchez_wf_set,
+  "fit_resamples",
+  resamples = sanchez_folds
+)
+
+collect_metrics(sanchez_rs) |> 
+  kable(caption = "Cristopher Sánchez - Performance Metrics Comparison") |> 
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+
+sanchez_fit <- extract_workflow(sanchez_rs, "recipe_1_decision_tree") |>
+  last_fit(sanchez_split)
+```
+
+### Tarik Skubal
+
+```{r}
+skubal_wf_set <- workflow_set(
+  list(skubal_base_rec, skubal_base_rec, skubal_scaled_rec),
+  list(dt_spec, rf_spec, knn_spec),
+  cross = FALSE
+)
+
+skubal_rs <- workflow_map(
+  skubal_wf_set,
+  "fit_resamples",
+  resamples = skubal_folds
+)
+
+collect_metrics(skubal_rs) |> 
+  kable(caption = "Tarik Skubal - Performance Metrics Comparison") |> 
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+
+skubal_fit <- extract_workflow(skubal_rs, "recipe_2_rand_forest") |>
+  last_fit(skubal_split)
+```
+
+### Paul Skenes
+
+```{r} 
+skenes_wf_set <- workflow_set(
+  list(skenes_base_rec, skenes_base_rec, skenes_scaled_rec),
+  list(dt_spec, rf_spec, knn_spec),
+  cross = FALSE
+)
+
+skenes_rs <- workflow_map(
+  skenes_wf_set,
+  "fit_resamples",
+  resamples = skenes_folds
+)
+
+collect_metrics(skenes_rs) |> 
+  kable(caption = "Paul Skenes - Performance Metrics Comparison") |> 
+  kable_styling(bootstrap_options = c("hover", "condensed"))
+
+skenes_fit <- extract_workflow(skenes_rs, "recipe_3_nearest_neighbor") |>
+  last_fit(skenes_split)
+```

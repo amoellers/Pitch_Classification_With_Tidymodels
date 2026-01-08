@@ -1,0 +1,4130 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.32">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Austin Moellers">
+<meta name="dcterms.date" content="2026-01-08">
+
+<title>Pitch Classification With Tidymodels</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-37eea08aefeeee20ff55810ff984fec1.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-bb05f5d0074da2129d766b238819cd35.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="site_libs/quarto-contrib/videojs/video.min.js"></script>
+<link href="site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<script src="site_libs/kePrint-0.0.1/kePrint.js"></script>
+
+<link href="site_libs/lightable-0.0.1/lightable.css" rel="stylesheet">
+
+
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-search-results"></div>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#exploratory-analysis" id="toc-exploratory-analysis" class="nav-link" data-scroll-target="#exploratory-analysis">Exploratory Analysis</a>
+  <ul class="collapse">
+  <li><a href="#overview" id="toc-overview" class="nav-link" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#release_speed" id="toc-release_speed" class="nav-link" data-scroll-target="#release_speed"><code>release_speed</code></a></li>
+  <li><a href="#ax-az" id="toc-ax-az" class="nav-link" data-scroll-target="#ax-az"><code>ax &amp; az</code></a></li>
+  <li><a href="#release_spin_rate" id="toc-release_spin_rate" class="nav-link" data-scroll-target="#release_spin_rate"><code>release_spin_rate</code></a></li>
+  <li><a href="#spin_axis" id="toc-spin_axis" class="nav-link" data-scroll-target="#spin_axis"><code>spin_axis</code></a></li>
+  </ul></li>
+  <li><a href="#pitchers" id="toc-pitchers" class="nav-link" data-scroll-target="#pitchers">Pitchers</a>
+  <ul class="collapse">
+  <li><a href="#cristopher-sánchez" id="toc-cristopher-sánchez" class="nav-link" data-scroll-target="#cristopher-sánchez">Cristopher Sánchez</a></li>
+  <li><a href="#tarik-skubal" id="toc-tarik-skubal" class="nav-link" data-scroll-target="#tarik-skubal">Tarik Skubal</a></li>
+  <li><a href="#paul-skenes" id="toc-paul-skenes" class="nav-link" data-scroll-target="#paul-skenes">Paul Skenes</a></li>
+  </ul></li>
+  <li><a href="#modeling" id="toc-modeling" class="nav-link" data-scroll-target="#modeling">Modeling</a>
+  <ul class="collapse">
+  <li><a href="#decision-tree" id="toc-decision-tree" class="nav-link" data-scroll-target="#decision-tree">Decision Tree</a>
+  <ul class="collapse">
+  <li><a href="#cristopher-sánchez-1" id="toc-cristopher-sánchez-1" class="nav-link" data-scroll-target="#cristopher-sánchez-1">Cristopher Sánchez</a></li>
+  <li><a href="#tarik-skubal-1" id="toc-tarik-skubal-1" class="nav-link" data-scroll-target="#tarik-skubal-1">Tarik Skubal</a></li>
+  <li><a href="#paul-skenes-1" id="toc-paul-skenes-1" class="nav-link" data-scroll-target="#paul-skenes-1">Paul Skenes</a></li>
+  </ul></li>
+  <li><a href="#random-forest" id="toc-random-forest" class="nav-link" data-scroll-target="#random-forest">Random Forest</a>
+  <ul class="collapse">
+  <li><a href="#cristopher-sánchez-2" id="toc-cristopher-sánchez-2" class="nav-link" data-scroll-target="#cristopher-sánchez-2">Cristopher Sánchez</a></li>
+  <li><a href="#tarik-skubal-2" id="toc-tarik-skubal-2" class="nav-link" data-scroll-target="#tarik-skubal-2">Tarik Skubal</a></li>
+  <li><a href="#paul-skenes-2" id="toc-paul-skenes-2" class="nav-link" data-scroll-target="#paul-skenes-2">Paul Skenes</a></li>
+  </ul></li>
+  <li><a href="#k-nearest-neighbors-knn" id="toc-k-nearest-neighbors-knn" class="nav-link" data-scroll-target="#k-nearest-neighbors-knn">K-Nearest Neighbors (KNN)</a>
+  <ul class="collapse">
+  <li><a href="#cristopher-sánchez-3" id="toc-cristopher-sánchez-3" class="nav-link" data-scroll-target="#cristopher-sánchez-3">Cristopher Sánchez</a></li>
+  <li><a href="#tarik-skubal-3" id="toc-tarik-skubal-3" class="nav-link" data-scroll-target="#tarik-skubal-3">Tarik Skubal</a></li>
+  <li><a href="#paul-skenes-3" id="toc-paul-skenes-3" class="nav-link" data-scroll-target="#paul-skenes-3">Paul Skenes</a></li>
+  </ul></li>
+  <li><a href="#comparison" id="toc-comparison" class="nav-link" data-scroll-target="#comparison">Comparison</a>
+  <ul class="collapse">
+  <li><a href="#cristopher-sánchez-4" id="toc-cristopher-sánchez-4" class="nav-link" data-scroll-target="#cristopher-sánchez-4">Cristopher Sánchez</a></li>
+  <li><a href="#tarik-skubal-4" id="toc-tarik-skubal-4" class="nav-link" data-scroll-target="#tarik-skubal-4">Tarik Skubal</a></li>
+  <li><a href="#paul-skenes-4" id="toc-paul-skenes-4" class="nav-link" data-scroll-target="#paul-skenes-4">Paul Skenes</a></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+<div class="quarto-other-links"><h2>Other Links</h2><ul><li><a href="https://github.com/amoellers/"><i class="bi bi-github"></i>GitHub</a></li><li><a href="https://www.linkedin.com/in/austinmoellers/"><i class="bi bi-linkedin"></i>LinkedIn</a></li><li><a href="https://austin.quarto.pub/"><i class="bi bi-book"></i>Quarto Pub</a></li></ul></div><div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/amoellers/Pitch_Classification_With_Tidymodels/" target="_blank"><i class="bi bi-github"></i>GitHub Repo</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Pitch Classification With Tidymodels</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Austin Moellers <a href="mailto:AustinMoellers@outlook.com" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">January 8, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><strong>WORK IN PROGRESS</strong></p>
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>My favourite thing to do while watching a baseball game (other than stuffing my face) is guessing the type of pitch after it’s been thrown. It may sound weird, but I can’t be the only one, since Baseball Savant has their own dedicated game called <a href="https://baseballsavant.mlb.com/games/pitch-type-guess">“Guess the Pitch Type”</a> (My best score is 18 out of 20). I’ve always found it interesting how a broadcast can instantly display the type of pitch and wondered what information and modeling algorithms they’re using to make this prediction. In this publication I’m going to investigate just that.</p>
+</section>
+<section id="exploratory-analysis" class="level1">
+<h1>Exploratory Analysis</h1>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>Here is a quick look at the quantitative variables of interest. The following table displays the median values of the variables of interest for each pitch type listed in the 2025 statcast data.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_speed</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">ax</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">az</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_spin_rate</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">spin_axis</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">arm_angle</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">94.50</td>
+<td style="text-align: right;">-7.5124615</td>
+<td style="text-align: right;">-14.19235</td>
+<td style="text-align: right;">2324.0</td>
+<td style="text-align: right;">208.0</td>
+<td style="text-align: right;">40.30</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">94.00</td>
+<td style="text-align: right;">-16.0153319</td>
+<td style="text-align: right;">-23.41607</td>
+<td style="text-align: right;">2192.0</td>
+<td style="text-align: right;">217.0</td>
+<td style="text-align: right;">33.70</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Pitch Out</td>
+<td style="text-align: right;">91.45</td>
+<td style="text-align: right;">-8.8737948</td>
+<td style="text-align: right;">-17.25759</td>
+<td style="text-align: right;">2271.5</td>
+<td style="text-align: right;">216.0</td>
+<td style="text-align: right;">37.60</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Cutter</td>
+<td style="text-align: right;">89.70</td>
+<td style="text-align: right;">0.7322950</td>
+<td style="text-align: right;">-23.85651</td>
+<td style="text-align: right;">2414.0</td>
+<td style="text-align: right;">184.0</td>
+<td style="text-align: right;">39.10</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">86.40</td>
+<td style="text-align: right;">1.5480337</td>
+<td style="text-align: right;">-30.02703</td>
+<td style="text-align: right;">2435.0</td>
+<td style="text-align: right;">145.0</td>
+<td style="text-align: right;">39.90</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">86.30</td>
+<td style="text-align: right;">-11.9283569</td>
+<td style="text-align: right;">-27.74882</td>
+<td style="text-align: right;">1793.0</td>
+<td style="text-align: right;">231.0</td>
+<td style="text-align: right;">36.10</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: right;">86.30</td>
+<td style="text-align: right;">-10.8711843</td>
+<td style="text-align: right;">-28.96604</td>
+<td style="text-align: right;">1378.0</td>
+<td style="text-align: right;">236.0</td>
+<td style="text-align: right;">39.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Screwball</td>
+<td style="text-align: right;">85.60</td>
+<td style="text-align: right;">-11.9158361</td>
+<td style="text-align: right;">-27.76816</td>
+<td style="text-align: right;">1091.0</td>
+<td style="text-align: right;">275.0</td>
+<td style="text-align: right;">26.60</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Knuckle Curve</td>
+<td style="text-align: right;">83.40</td>
+<td style="text-align: right;">3.3127451</td>
+<td style="text-align: right;">-39.99981</td>
+<td style="text-align: right;">2496.0</td>
+<td style="text-align: right;">42.0</td>
+<td style="text-align: right;">42.30</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">82.70</td>
+<td style="text-align: right;">9.0155974</td>
+<td style="text-align: right;">-31.28524</td>
+<td style="text-align: right;">2598.0</td>
+<td style="text-align: right;">70.0</td>
+<td style="text-align: right;">31.60</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Forkball</td>
+<td style="text-align: right;">82.50</td>
+<td style="text-align: right;">-9.1322123</td>
+<td style="text-align: right;">-30.95555</td>
+<td style="text-align: right;">1197.5</td>
+<td style="text-align: right;">250.5</td>
+<td style="text-align: right;">44.50</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slurve</td>
+<td style="text-align: right;">81.90</td>
+<td style="text-align: right;">6.9760142</td>
+<td style="text-align: right;">-36.05468</td>
+<td style="text-align: right;">2540.5</td>
+<td style="text-align: right;">56.0</td>
+<td style="text-align: right;">35.60</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">80.00</td>
+<td style="text-align: right;">4.3609651</td>
+<td style="text-align: right;">-40.07122</td>
+<td style="text-align: right;">2583.0</td>
+<td style="text-align: right;">52.0</td>
+<td style="text-align: right;">44.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Knuckleball</td>
+<td style="text-align: right;">77.65</td>
+<td style="text-align: right;">-1.0881771</td>
+<td style="text-align: right;">-32.04051</td>
+<td style="text-align: right;">282.0</td>
+<td style="text-align: right;">49.0</td>
+<td style="text-align: right;">34.30</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slow Curve</td>
+<td style="text-align: right;">72.00</td>
+<td style="text-align: right;">2.8505047</td>
+<td style="text-align: right;">-35.82704</td>
+<td style="text-align: right;">2514.0</td>
+<td style="text-align: right;">190.0</td>
+<td style="text-align: right;">34.25</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Other</td>
+<td style="text-align: right;">67.75</td>
+<td style="text-align: right;">-5.2617059</td>
+<td style="text-align: right;">-24.09361</td>
+<td style="text-align: right;">1718.0</td>
+<td style="text-align: right;">221.0</td>
+<td style="text-align: right;">32.90</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Eephus</td>
+<td style="text-align: right;">50.50</td>
+<td style="text-align: right;">-0.7355639</td>
+<td style="text-align: right;">-28.06706</td>
+<td style="text-align: right;">1253.0</td>
+<td style="text-align: right;">205.0</td>
+<td style="text-align: right;">50.70</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><strong>Below is a brief introduction to these variables:</strong></p>
+<p><code>pitch_name</code> : The name of the pitch derived from the Statcast Data.</p>
+<p><code>release_speed</code> : Pitch velocity out-of-hand.</p>
+<p><code>ax</code> : The acceleration of the pitch, in feet per second per second, in x-dimension, determined at y = 50 feet.</p>
+<p><code>az</code> : The acceleration of the pitch, in feet per second per second, in z-dimension, determined at y = 50 feet.</p>
+<p><code>release_spin_rate</code> : Spin rate of pitch tracked by Statcast.</p>
+<p><code>spin_axis</code> : The Spin Axis in the 2D X-Z plane in degrees from 0 to 360, such that 180 represents a pure backspin fastball and 0 degrees represents a pure topspin (12-6) curveball.</p>
+<p><code>arm_angle</code> : …</p>
+<p>Here is a pairs plot for the 2025 xFIP leader <a href="https://www.baseball-reference.com/players/c/crochga01.shtml">Garrett Crochet</a>. Several variables allow us to easily separate Crochet’s pitches, especially <code>release speed</code> and <code>ax</code> (see the plot in row 1, column 2).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-pairs" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-pairs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-pairs-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-pairs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Scatterplot Matrix of Garrett Crochet’s Pitches (2025 Season)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="release_speed" class="level2">
+<h2 class="anchored" data-anchor-id="release_speed"><code>release_speed</code></h2>
+<p>Release speed (or velocity) does a great job of separating between fastballs, breaking balls, and off-speed pitches. In the plot below there is a clear drop off in velocity between the fastballs and off-speed/breaking pitches. Other variables are required to distinguish between different types of fastballs, as well as between the off-speed and breaking pitches.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-release-speed" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-release-speed-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-release-speed-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-release-speed-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Boxplots of Release Speeds for MLB Pitches - 2025 Season (Minimum 100 Pitches)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="ax-az" class="level2">
+<h2 class="anchored" data-anchor-id="ax-az"><code>ax &amp; az</code></h2>
+<p>Acceleration speeds do a great job of separating pitches with similar release speeds. The following plot is of the horizontal and vertical acceleration speeds for <a href="https://www.baseball-reference.com/players/s/salech01.shtml">Chris Sale</a>’s 2025 pitches, notice how the slider and changeup are easily distinguished, as well as the 4-seam fastball and sinker.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-acceleration" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-acceleration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-acceleration-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-acceleration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Scatterplot of Acceleration Speeds - Chris Sale (2025 Season)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="release_spin_rate" class="level2">
+<h2 class="anchored" data-anchor-id="release_spin_rate"><code>release_spin_rate</code></h2>
+<p>Release spin rate also does a great job of separating between fastballs, breaking balls, and off-speed pitches. In the plot below there is a large drop between the off-speed pitches and other pitch groups.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-spin_rate" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-spin_rate-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-spin_rate-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-spin_rate-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Boxplots of Spin Rates for MLB Pitches - 2025 Season (Minimum 100 Pitches)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The spin rate of a pitch is generally positively correlated with it’s release speed (the exception being the knuckle curve), but each pitch type has a different slope. Using the 4-seam fastball as our baseline, every pitch has a significantly different slope, and every pitch except the sweeper has a significantly different intercept. The release speed and pitch type explain approximately 62% of the variance in spin rate.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Linear Regression Coefficients for Spin Rate ~ Speed</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">term</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">estimate</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std.error</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">statistic</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p.value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: right;">438.478131</td>
+<td style="text-align: right;">17.2731258</td>
+<td style="text-align: right;">25.384990</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">release_speed</td>
+<td style="text-align: right;">19.936841</td>
+<td style="text-align: right;">0.1826759</td>
+<td style="text-align: right;">109.137760</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pitch_nameSlider</td>
+<td style="text-align: right;">1053.344850</td>
+<td style="text-align: right;">25.4794351</td>
+<td style="text-align: right;">41.340981</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pitch_nameSplit-Finger</td>
+<td style="text-align: right;">-2914.713480</td>
+<td style="text-align: right;">38.8512211</td>
+<td style="text-align: right;">-75.022442</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pitch_nameSinker</td>
+<td style="text-align: right;">155.347723</td>
+<td style="text-align: right;">28.2210777</td>
+<td style="text-align: right;">5.504670</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pitch_nameCurveball</td>
+<td style="text-align: right;">846.826340</td>
+<td style="text-align: right;">27.5564705</td>
+<td style="text-align: right;">30.730581</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pitch_nameSweeper</td>
+<td style="text-align: right;">-59.639050</td>
+<td style="text-align: right;">32.5591037</td>
+<td style="text-align: right;">-1.831717</td>
+<td style="text-align: right;">0.0669941</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pitch_nameCutter</td>
+<td style="text-align: right;">706.240489</td>
+<td style="text-align: right;">33.3396539</td>
+<td style="text-align: right;">21.183198</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pitch_nameKnuckle Curve</td>
+<td style="text-align: right;">3050.732348</td>
+<td style="text-align: right;">47.3264460</td>
+<td style="text-align: right;">64.461471</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pitch_nameChangeup</td>
+<td style="text-align: right;">712.800314</td>
+<td style="text-align: right;">25.7407292</td>
+<td style="text-align: right;">27.691535</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">release_speed:pitch_nameSlider</td>
+<td style="text-align: right;">-8.991592</td>
+<td style="text-align: right;">0.2838587</td>
+<td style="text-align: right;">-31.676294</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">release_speed:pitch_nameSplit-Finger</td>
+<td style="text-align: right;">24.208414</td>
+<td style="text-align: right;">0.4416112</td>
+<td style="text-align: right;">54.818391</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">release_speed:pitch_nameSinker</td>
+<td style="text-align: right;">-2.922556</td>
+<td style="text-align: right;">0.2998280</td>
+<td style="text-align: right;">-9.747443</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">release_speed:pitch_nameCurveball</td>
+<td style="text-align: right;">-3.501003</td>
+<td style="text-align: right;">0.3251848</td>
+<td style="text-align: right;">-10.766197</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">release_speed:pitch_nameSweeper</td>
+<td style="text-align: right;">6.943421</td>
+<td style="text-align: right;">0.3809001</td>
+<td style="text-align: right;">18.228984</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">release_speed:pitch_nameCutter</td>
+<td style="text-align: right;">-5.746950</td>
+<td style="text-align: right;">0.3663366</td>
+<td style="text-align: right;">-15.687620</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">release_speed:pitch_nameKnuckle Curve</td>
+<td style="text-align: right;">-31.894105</td>
+<td style="text-align: right;">0.5610943</td>
+<td style="text-align: right;">-56.842680</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">release_speed:pitch_nameChangeup</td>
+<td style="text-align: right;">-12.538147</td>
+<td style="text-align: right;">0.2875658</td>
+<td style="text-align: right;">-43.600973</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Measures of Model Fit for Spin Rate ~ Speed</caption>
+<thead>
+<tr class="header">
+<th style="text-align: right;" data-quarto-table-cell-role="th">r.squared</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">adj.r.squared</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">sigma</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">statistic</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p.value</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">df</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">logLik</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">AIC</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">BIC</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">deviance</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">df.residual</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">nobs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0.618679</td>
+<td style="text-align: right;">0.61867</td>
+<td style="text-align: right;">222.5587</td>
+<td style="text-align: right;">68299.96</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">17</td>
+<td style="text-align: right;">-4883734</td>
+<td style="text-align: right;">9767506</td>
+<td style="text-align: right;">9767724</td>
+<td style="text-align: right;">35447348475</td>
+<td style="text-align: right;">715640</td>
+<td style="text-align: right;">715658</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>The next plot shows the correlation between release speed and spin rate. Most pitches display a positive correlation, where as others (like the knuckle curve) have a negative correlations, and some (like the slider) have almost no correlation.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-spin_rate-2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-spin_rate-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-spin_rate-2-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-spin_rate-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Boxplots of Spin Rates for MLB Pitches - 2025 Season (Minimum 100 Pitches)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="spin_axis" class="level2">
+<h2 class="anchored" data-anchor-id="spin_axis"><code>spin_axis</code></h2>
+<p>Since the spin axis is a radial feature, It will need to be converted into two separate variables using sine and cosine.</p>
+<p>Spin axis does a great job of separating pitches with similar release speeds. In the plot below, the slider and changeup are easily distinguished, as well as the 4-seam fastball and sinker.</p>
+<div class="cell quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="cell-output-display quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-spin-axis-1" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-spin-axis-1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-spin-axis-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-spin-axis-1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Radial Plot of Pitch Axis Vs. Z-Dimension Acceleration - Chris Sale (2025)
+</figcaption>
+</figure>
+</div>
+</div>
+<div class="cell-output-display quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-spin-axis-2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-spin-axis-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-spin-axis-2.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-spin-axis-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Scatterplot of Spin Axis, X vs.&nbsp;Z direction - Random sample of 5000 pitches (2025)
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="pitchers" class="level1">
+<h1>Pitchers</h1>
+<p>I have elected to run my models on the Statcast data from three pitchers: 2025 NL Cy Young runner-up <a href="https://www.baseball-reference.com/players/s/sanchcr01.shtml">Cristopher Sánchez</a>, 2025 AL Cy Young winner <a href="https://www.baseball-reference.com/players/s/skubata01.shtml">Tarik Skubal</a>, and 2025 NL Cy Young winner <a href="https://www.baseball-reference.com/players/s/skenepa01.shtml">Paul Skenes</a>. I chose these three due to the varying number of unique pitches they throw. Sánchez throws just three, where as Skubal and Skenes throw five and Seven, respectively.</p>
+<section id="cristopher-sánchez" class="level2">
+<h2 class="anchored" data-anchor-id="cristopher-sánchez">Cristopher Sánchez</h2>
+<div class="grid">
+<div class="g-col-2">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://www.baseball-reference.com/req/2025011210/images/headshots/1/107b03be_mlbam.jpg" class="img-fluid figure-img"></p>
+<figcaption>Cristopher Sánchez - Source: Baseball Reference</figcaption>
+</figure>
+</div>
+</div>
+<div class="g-col-10">
+<p>Cristopher Sánchez is a Dominican professional MLB pitcher known for his smooth left-handed delivery, heavy sinker, and devastating changeup that generates weak contact and strikeouts. Born on October 25, 1996, in San Juan de la Maguana, Dominican Republic, he was signed by the Philadelphia Phillies as an international free agent in 2013. Sánchez made his major league debut in 2021 and gradually developed into a key piece of the Phillies’ pitching staff. Breakout performances in subsequent seasons established him as one of the most reliable starters in the National League, highlighted by his improved command, ability to induce ground balls, and effectiveness against both right- and left-handed hitters. Widely regarded as one of the top emerging left-handed starters in MLB, Sánchez continues to anchor Philadelphia’s rotation as a frontline arm.</p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - Career Statistics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Season</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">Team</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Age</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">W</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">L</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">SV</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">G</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">GS</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">IP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">K/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">BB/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">HR/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">BABIP</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">GB%</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">vFA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">ERA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">xERA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">FIP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">xFIP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">WAR</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">2021</td>
+<td style="text-align: left;">PHI</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">12.2</td>
+<td style="text-align: right;">9.24</td>
+<td style="text-align: right;">4.97</td>
+<td style="text-align: right;">0.71</td>
+<td style="text-align: right;">0.395</td>
+<td style="text-align: left;">63.90%</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">4.97</td>
+<td style="text-align: right;">3.30</td>
+<td style="text-align: right;">3.80</td>
+<td style="text-align: right;">3.89</td>
+<td style="text-align: right;">0.1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2022</td>
+<td style="text-align: left;">PHI</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">40.0</td>
+<td style="text-align: right;">7.88</td>
+<td style="text-align: right;">3.83</td>
+<td style="text-align: right;">1.13</td>
+<td style="text-align: right;">0.284</td>
+<td style="text-align: left;">54.20%</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">5.63</td>
+<td style="text-align: right;">4.29</td>
+<td style="text-align: right;">4.56</td>
+<td style="text-align: right;">4.20</td>
+<td style="text-align: right;">0.0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">2023</td>
+<td style="text-align: left;">PHI</td>
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">99.1</td>
+<td style="text-align: right;">8.70</td>
+<td style="text-align: right;">1.45</td>
+<td style="text-align: right;">1.45</td>
+<td style="text-align: right;">0.272</td>
+<td style="text-align: left;">57.00%</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">3.44</td>
+<td style="text-align: right;">3.74</td>
+<td style="text-align: right;">3.99</td>
+<td style="text-align: right;">3.09</td>
+<td style="text-align: right;">1.8</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2024</td>
+<td style="text-align: left;">PHI</td>
+<td style="text-align: right;">27</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">31</td>
+<td style="text-align: right;">31</td>
+<td style="text-align: right;">181.2</td>
+<td style="text-align: right;">7.58</td>
+<td style="text-align: right;">2.18</td>
+<td style="text-align: right;">0.54</td>
+<td style="text-align: right;">0.313</td>
+<td style="text-align: left;">57.40%</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">3.32</td>
+<td style="text-align: right;">3.55</td>
+<td style="text-align: right;">3.00</td>
+<td style="text-align: right;">3.19</td>
+<td style="text-align: right;">4.7</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">2025</td>
+<td style="text-align: left;">PHI</td>
+<td style="text-align: right;">28</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">202.0</td>
+<td style="text-align: right;">9.45</td>
+<td style="text-align: right;">1.96</td>
+<td style="text-align: right;">0.53</td>
+<td style="text-align: right;">0.298</td>
+<td style="text-align: left;">58.30%</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">2.50</td>
+<td style="text-align: right;">3.01</td>
+<td style="text-align: right;">2.55</td>
+<td style="text-align: right;">2.77</td>
+<td style="text-align: right;">6.4</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Total</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">21</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">104</td>
+<td style="text-align: right;">85</td>
+<td style="text-align: right;">535.2</td>
+<td style="text-align: right;">8.55</td>
+<td style="text-align: right;">2.15</td>
+<td style="text-align: right;">0.76</td>
+<td style="text-align: right;">0.300</td>
+<td style="text-align: left;">57.50%</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">3.24</td>
+<td style="text-align: right;">3.42</td>
+<td style="text-align: right;">3.15</td>
+<td style="text-align: right;">3.11</td>
+<td style="text-align: right;">12.9</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="grid">
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-sz-sanchez" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sz-sanchez-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-sz-sanchez-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sz-sanchez-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Sample of Cristopher Sánchez’s Arsenal (100 Pitches) - Catcher’s Perspective
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - 2025 Pitch Mix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">percent</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">1417</td>
+<td style="text-align: left;">45.9%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">1161</td>
+<td style="text-align: left;">37.6%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">506</td>
+<td style="text-align: left;">16.4%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - 2025 Pitch Attributes (Median)</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_speed</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">ax</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">az</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_spin_rate</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">spin_axis_x</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">spin_axis_z</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">95.5</td>
+<td style="text-align: right;">21.7122633</td>
+<td style="text-align: right;">-26.56065</td>
+<td style="text-align: right;">2139.0</td>
+<td style="text-align: right;">0.8571673</td>
+<td style="text-align: right;">-0.5150381</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">86.3</td>
+<td style="text-align: right;">16.4406044</td>
+<td style="text-align: right;">-32.53692</td>
+<td style="text-align: right;">2052.0</td>
+<td style="text-align: right;">0.9612617</td>
+<td style="text-align: right;">-0.2756374</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">85.8</td>
+<td style="text-align: right;">-0.2262266</td>
+<td style="text-align: right;">-31.57910</td>
+<td style="text-align: right;">2091.5</td>
+<td style="text-align: right;">-0.7193398</td>
+<td style="text-align: right;">0.3664873</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="https://sporty-clips.mlb.com/M3k0ejRfWGw0TUFRPT1fQVFWVUFBVlFWbGNBRGxRRlVnQUhDUUpYQUZoV1VWWUFDMVVCQkF0V0FWSlNBRlpW.mp4"></video></div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="https://sporty-clips.mlb.com/b0dXa2xfWGw0TUFRPT1fQVZRRlVWY0RYZ29BWEZvQVZ3QUhBdzlUQUZoVEFsTUFBZ0VCVWdWWFUxQlhCd01F.mp4"></video></div>
+</div>
+</div>
+</div>
+</section>
+<section id="tarik-skubal" class="level2">
+<h2 class="anchored" data-anchor-id="tarik-skubal">Tarik Skubal</h2>
+<div class="grid">
+<div class="g-col-2">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://www.baseball-reference.com/req/2025011210/images/headshots/1/1e4029ec_mlbam.jpg" class="img-fluid figure-img"></p>
+<figcaption>Tarik Skubal - Source: Baseball Reference</figcaption>
+</figure>
+</div>
+</div>
+<div class="g-col-10">
+<p>Tarik Daniel Skubal is an American professional MLB pitcher known for his dominant left-handed arsenal and elite strikeout ability. Born on November 20, 1996, in Haymarket, Virginia, he was drafted by the Detroit Tigers in the ninth round of the 2018 MLB Draft out of Seattle University. Skubal made his major league debut on August 18, 2020, and steadily developed into one of the most reliable starters in baseball. Breakout performances in subsequent seasons established him as the ace of the Tigers’ rotation, highlighted by his overpowering fastball, sharp slider, and improved command. Widely regarded as one of the top left-handed pitchers in MLB, Skubal continues to anchor Detroit’s pitching staff as a frontline starter.</p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - Career Statistics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Season</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">Team</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Age</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">W</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">L</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">SV</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">G</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">GS</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">IP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">K/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">BB/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">HR/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">BABIP</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">GB%</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">vFA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">ERA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">xERA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">FIP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">xFIP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">WAR</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">2020</td>
+<td style="text-align: left;">DET</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">32.0</td>
+<td style="text-align: right;">10.41</td>
+<td style="text-align: right;">3.09</td>
+<td style="text-align: right;">2.53</td>
+<td style="text-align: right;">0.253</td>
+<td style="text-align: left;">27.70%</td>
+<td style="text-align: right;">94.5</td>
+<td style="text-align: right;">5.63</td>
+<td style="text-align: right;">4.49</td>
+<td style="text-align: right;">5.75</td>
+<td style="text-align: right;">4.81</td>
+<td style="text-align: right;">-0.1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2021</td>
+<td style="text-align: left;">DET</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">31</td>
+<td style="text-align: right;">29</td>
+<td style="text-align: right;">149.1</td>
+<td style="text-align: right;">9.88</td>
+<td style="text-align: right;">2.83</td>
+<td style="text-align: right;">2.11</td>
+<td style="text-align: right;">0.277</td>
+<td style="text-align: left;">38.50%</td>
+<td style="text-align: right;">94.5</td>
+<td style="text-align: right;">4.34</td>
+<td style="text-align: right;">5.58</td>
+<td style="text-align: right;">5.09</td>
+<td style="text-align: right;">4.06</td>
+<td style="text-align: right;">0.6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">2022</td>
+<td style="text-align: left;">DET</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">21</td>
+<td style="text-align: right;">21</td>
+<td style="text-align: right;">117.2</td>
+<td style="text-align: right;">8.95</td>
+<td style="text-align: right;">2.45</td>
+<td style="text-align: right;">0.69</td>
+<td style="text-align: right;">0.299</td>
+<td style="text-align: left;">45.70%</td>
+<td style="text-align: right;">94.2</td>
+<td style="text-align: right;">3.52</td>
+<td style="text-align: right;">3.33</td>
+<td style="text-align: right;">2.96</td>
+<td style="text-align: right;">3.40</td>
+<td style="text-align: right;">2.9</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2023</td>
+<td style="text-align: left;">DET</td>
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">80.1</td>
+<td style="text-align: right;">11.43</td>
+<td style="text-align: right;">1.57</td>
+<td style="text-align: right;">0.45</td>
+<td style="text-align: right;">0.289</td>
+<td style="text-align: left;">51.60%</td>
+<td style="text-align: right;">95.8</td>
+<td style="text-align: right;">2.80</td>
+<td style="text-align: right;">2.31</td>
+<td style="text-align: right;">2.00</td>
+<td style="text-align: right;">2.56</td>
+<td style="text-align: right;">3.3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">2024</td>
+<td style="text-align: left;">DET</td>
+<td style="text-align: right;">27</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">31</td>
+<td style="text-align: right;">31</td>
+<td style="text-align: right;">192.0</td>
+<td style="text-align: right;">10.69</td>
+<td style="text-align: right;">1.64</td>
+<td style="text-align: right;">0.70</td>
+<td style="text-align: right;">0.273</td>
+<td style="text-align: left;">45.70%</td>
+<td style="text-align: right;">97.0</td>
+<td style="text-align: right;">2.39</td>
+<td style="text-align: right;">2.72</td>
+<td style="text-align: right;">2.49</td>
+<td style="text-align: right;">2.83</td>
+<td style="text-align: right;">6.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2025</td>
+<td style="text-align: left;">DET</td>
+<td style="text-align: right;">28</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">31</td>
+<td style="text-align: right;">31</td>
+<td style="text-align: right;">195.1</td>
+<td style="text-align: right;">11.10</td>
+<td style="text-align: right;">1.52</td>
+<td style="text-align: right;">0.83</td>
+<td style="text-align: right;">0.273</td>
+<td style="text-align: left;">41.00%</td>
+<td style="text-align: right;">97.7</td>
+<td style="text-align: right;">2.21</td>
+<td style="text-align: right;">2.72</td>
+<td style="text-align: right;">2.45</td>
+<td style="text-align: right;">2.66</td>
+<td style="text-align: right;">6.6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Total</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">54</td>
+<td style="text-align: right;">37</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">137</td>
+<td style="text-align: right;">134</td>
+<td style="text-align: right;">766.2</td>
+<td style="text-align: right;">10.44</td>
+<td style="text-align: right;">2.02</td>
+<td style="text-align: right;">1.06</td>
+<td style="text-align: right;">0.279</td>
+<td style="text-align: left;">42.80%</td>
+<td style="text-align: right;">95.8</td>
+<td style="text-align: right;">3.08</td>
+<td style="text-align: right;">3.32</td>
+<td style="text-align: right;">3.14</td>
+<td style="text-align: right;">3.17</td>
+<td style="text-align: right;">19.3</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="grid">
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-sz-skubal" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sz-skubal-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-sz-skubal-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sz-skubal-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Sample of Tarik Skubal’s Arsenal (100 Pitches) - Catcher’s Perspective
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - 2025 Pitch Mix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">percent</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">972</td>
+<td style="text-align: left;">30.9%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">952</td>
+<td style="text-align: left;">30.2%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">734</td>
+<td style="text-align: left;">23.3%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">407</td>
+<td style="text-align: left;">12.9%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">84</td>
+<td style="text-align: left;">2.7%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - 2025 Pitch Attributes (Median)</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_speed</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">ax</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">az</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_spin_rate</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">spin_axis_x</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">spin_axis_z</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">97.70</td>
+<td style="text-align: right;">5.016089</td>
+<td style="text-align: right;">-11.62915</td>
+<td style="text-align: right;">2363.5</td>
+<td style="text-align: right;">0.4067366</td>
+<td style="text-align: right;">-0.9135455</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">97.40</td>
+<td style="text-align: right;">16.470155</td>
+<td style="text-align: right;">-15.79657</td>
+<td style="text-align: right;">2247.0</td>
+<td style="text-align: right;">0.4383711</td>
+<td style="text-align: right;">-0.8987940</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">90.10</td>
+<td style="text-align: right;">-2.337998</td>
+<td style="text-align: right;">-26.94075</td>
+<td style="text-align: right;">2241.0</td>
+<td style="text-align: right;">0.0174524</td>
+<td style="text-align: right;">-0.9743701</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">88.00</td>
+<td style="text-align: right;">15.033143</td>
+<td style="text-align: right;">-25.24774</td>
+<td style="text-align: right;">1830.0</td>
+<td style="text-align: right;">0.7071068</td>
+<td style="text-align: right;">-0.7071068</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">81.15</td>
+<td style="text-align: right;">-3.245412</td>
+<td style="text-align: right;">-36.01989</td>
+<td style="text-align: right;">2521.0</td>
+<td style="text-align: right;">-0.5735764</td>
+<td style="text-align: right;">0.8191520</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="https://sporty-clips.mlb.com/RDFBbk1fV0ZRVkV3dEdEUT09X1YxTlpWRk1EQTFNQVd3RlVBQUFIVkZjRkFBQlVVZ0lBQmwxVUJ3WlVCRlZWVlFWZQ==.mp4"></video></div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="https://sporty-clips.mlb.com/QndYN0JfWGw0TUFRPT1fQUFkV0FWRU5YZ29BRGdZRlhnQUhVQUlIQUZsUlZGWUFWd1pUQmdkUUJRQlhVVkVD.mp4"></video></div>
+</div>
+</div>
+</div>
+</section>
+<section id="paul-skenes" class="level2">
+<h2 class="anchored" data-anchor-id="paul-skenes">Paul Skenes</h2>
+<div class="grid">
+<div class="g-col-2">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://www.baseball-reference.com/req/2025011210/images/headshots/2/2e7ed9f9_mlbam.jpg" class="img-fluid figure-img"></p>
+<figcaption>Paul Skenes - Source: Baseball Reference</figcaption>
+</figure>
+</div>
+</div>
+<div class="g-col-10">
+<p>Paul David Skenes is an American professional MLB pitcher known for his overpowering fastball and dominant starting presence. Born on May 29, 2002, in Fullerton, California, he played college baseball at the Air Force Academy before transferring to LSU, where he led the Tigers to the 2023 College World Series title. Skenes was selected first overall by the Pittsburgh Pirates in the 2023 MLB Draft and made his major league debut in 2024. He quickly established himself as one of baseball’s premier young aces, combining elite velocity with a devastating mix of secondary pitches, and continues to anchor the Pirates’ rotation as a frontline starter.</p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - Career Statistics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Season</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">Team</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Age</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">W</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">L</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">SV</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">G</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">GS</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">IP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">K/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">BB/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">HR/9</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">BABIP</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">GB%</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">vFA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">ERA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">xERA</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">FIP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">xFIP</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">WAR</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">2024</td>
+<td style="text-align: left;">PIT</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">133.0</td>
+<td style="text-align: right;">11.50</td>
+<td style="text-align: right;">2.17</td>
+<td style="text-align: right;">0.68</td>
+<td style="text-align: right;">0.284</td>
+<td style="text-align: left;">51.30%</td>
+<td style="text-align: right;">98.9</td>
+<td style="text-align: right;">1.96</td>
+<td style="text-align: right;">2.52</td>
+<td style="text-align: right;">2.44</td>
+<td style="text-align: right;">2.54</td>
+<td style="text-align: right;">4.3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2025</td>
+<td style="text-align: left;">PIT</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">187.2</td>
+<td style="text-align: right;">10.36</td>
+<td style="text-align: right;">2.01</td>
+<td style="text-align: right;">0.53</td>
+<td style="text-align: right;">0.273</td>
+<td style="text-align: left;">44.30%</td>
+<td style="text-align: right;">98.2</td>
+<td style="text-align: right;">1.97</td>
+<td style="text-align: right;">2.63</td>
+<td style="text-align: right;">2.36</td>
+<td style="text-align: right;">3.03</td>
+<td style="text-align: right;">6.5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Total</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">21</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">55</td>
+<td style="text-align: right;">55</td>
+<td style="text-align: right;">320.2</td>
+<td style="text-align: right;">10.83</td>
+<td style="text-align: right;">2.08</td>
+<td style="text-align: right;">0.59</td>
+<td style="text-align: right;">0.277</td>
+<td style="text-align: left;">47.10%</td>
+<td style="text-align: right;">98.5</td>
+<td style="text-align: right;">1.96</td>
+<td style="text-align: right;">2.58</td>
+<td style="text-align: right;">2.40</td>
+<td style="text-align: right;">2.83</td>
+<td style="text-align: right;">10.8</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="grid">
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-sz-skenes" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sz-skenes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-sz-skenes-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sz-skenes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: Sample of Paul Skenes’s Arsenal (100 Pitches) - Catcher’s Perspective
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - 2025 Pitch Mix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">percent</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">1196</td>
+<td style="text-align: left;">39.9%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">476</td>
+<td style="text-align: left;">15.9%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: right;">409</td>
+<td style="text-align: left;">13.6%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">326</td>
+<td style="text-align: left;">10.9%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">279</td>
+<td style="text-align: left;">9.3%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">171</td>
+<td style="text-align: left;">5.7%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">140</td>
+<td style="text-align: left;">4.7%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - 2025 Pitch Attributes (Median)</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_speed</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">ax</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">az</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">release_spin_rate</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">spin_axis_x</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">spin_axis_z</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">98.2</td>
+<td style="text-align: right;">-18.134856</td>
+<td style="text-align: right;">-18.10343</td>
+<td style="text-align: right;">2266</td>
+<td style="text-align: right;">-0.8480481</td>
+<td style="text-align: right;">-0.5299193</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">97.6</td>
+<td style="text-align: right;">-21.900695</td>
+<td style="text-align: right;">-24.19573</td>
+<td style="text-align: right;">2272</td>
+<td style="text-align: right;">-0.8660254</td>
+<td style="text-align: right;">-0.5000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: right;">93.6</td>
+<td style="text-align: right;">-15.457214</td>
+<td style="text-align: right;">-32.08898</td>
+<td style="text-align: right;">1683</td>
+<td style="text-align: right;">-0.9396926</td>
+<td style="text-align: right;">-0.3420201</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">88.8</td>
+<td style="text-align: right;">-16.953735</td>
+<td style="text-align: right;">-26.28521</td>
+<td style="text-align: right;">1801</td>
+<td style="text-align: right;">-0.9902681</td>
+<td style="text-align: right;">-0.1391731</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">85.2</td>
+<td style="text-align: right;">2.216290</td>
+<td style="text-align: right;">-25.30748</td>
+<td style="text-align: right;">2326</td>
+<td style="text-align: right;">0.9816272</td>
+<td style="text-align: right;">-0.1564345</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">84.5</td>
+<td style="text-align: right;">8.549715</td>
+<td style="text-align: right;">-26.92541</td>
+<td style="text-align: right;">2337</td>
+<td style="text-align: right;">0.9902681</td>
+<td style="text-align: right;">0.0174524</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">83.9</td>
+<td style="text-align: right;">3.959596</td>
+<td style="text-align: right;">-34.13282</td>
+<td style="text-align: right;">2446</td>
+<td style="text-align: right;">0.9876883</td>
+<td style="text-align: right;">0.1391731</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="https://sporty-clips.mlb.com/TkE5eTZfVjBZQUhRPT1fQmxOU1ZsQldWUVVBRHdBRFVRQUhVbE5WQUFCVFVRY0FBbEpRVWxaUlV3RlhDQU1E.mp4"></video></div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="https://sporty-clips.mlb.com/MDRXanhfVjBZQUhRPT1fQndaWFVsVldWd1lBQ0ZRTFZnQUhBUVFFQUZsWFVnTUFCMVFBQ1FNRkFnUlFDRllI.mp4"></video></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="modeling" class="level1">
+<h1>Modeling</h1>
+<section id="decision-tree" class="level2">
+<h2 class="anchored" data-anchor-id="decision-tree">Decision Tree</h2>
+<section id="cristopher-sánchez-1" class="level3">
+<h3 class="anchored" data-anchor-id="cristopher-sánchez-1">Cristopher Sánchez</h3>
+<div class="grid">
+<div class="g-col-6">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - Decision Tree Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9991323</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0005785</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0008671</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0005777</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9988917</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0007549</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-6">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - Decision Tree Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">355</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">291</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">127</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-sanchez-dt" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sanchez-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-sanchez-dt-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sanchez-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;11: Decision Tree for Cristopher Sánchez
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="tarik-skubal-1" class="level3">
+<h3 class="anchored" data-anchor-id="tarik-skubal-1">Tarik Skubal</h3>
+<div class="grid">
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - Decision Tree Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9881153</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0023483</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0117121</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0022855</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9959984</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0007580</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - Decision Tree Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">235</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">237</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">181</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">24</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-skubal-dt" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-skubal-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-skubal-dt-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-skubal-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;12: Decision Tree for Tarik Skubal
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="paul-skenes-1" class="level3">
+<h3 class="anchored" data-anchor-id="paul-skenes-1">Paul Skenes</h3>
+<div class="grid">
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - Decision Tree Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9532646</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0032177</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0434634</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0027117</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9853129</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0029258</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - Decision Tree Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Split-Finger</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sweeper</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">283</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">78</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">99</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">119</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">59</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">43</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">32</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-skenes-dt" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-skenes-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-skenes-dt-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-skenes-dt-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;13: Decision Tree for Paul Skenes
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="random-forest" class="level2">
+<h2 class="anchored" data-anchor-id="random-forest">Random Forest</h2>
+<section id="cristopher-sánchez-2" class="level3">
+<h3 class="anchored" data-anchor-id="cristopher-sánchez-2">Cristopher Sánchez</h3>
+<div class="grid">
+<div class="g-col-6">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - Random Forest Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9986994</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0006622</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0019605</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0006016</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9998195</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0000951</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-6">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - Random Forest Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">355</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">291</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">127</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-sanchez-rf-roc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sanchez-rf-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-sanchez-rf-roc-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sanchez-rf-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;14: ROC Curves for Cristopher Sánchez’s Random Forest Model
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="tarik-skubal-2" class="level3">
+<h3 class="anchored" data-anchor-id="tarik-skubal-2">Tarik Skubal</h3>
+<div class="grid">
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - Random Forest Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9970320</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0009029</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0032959</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0005495</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9999649</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0000312</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - Random Forest Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">236</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">103</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">243</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">182</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">24</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-skubal-rf-roc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-skubal-rf-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-skubal-rf-roc-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-skubal-rf-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;15: ROC Curves for Tarik Skubal’s Random Forest Model
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.pred_class</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.5838567</td>
+<td style="text-align: right;">0.0001111</td>
+<td style="text-align: right;">0.0064008</td>
+<td style="text-align: right;">0.4096313</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0.0282139</td>
+<td style="text-align: right;">0.0548813</td>
+<td style="text-align: right;">0.5670706</td>
+<td style="text-align: right;">0.3498341</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="paul-skenes-2" class="level3">
+<h3 class="anchored" data-anchor-id="paul-skenes-2">Paul Skenes</h3>
+<div class="grid">
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - Random Forest Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9737274</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0025142</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0222003</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0016242</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9991813</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0001821</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - Random Forest Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Split-Finger</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sweeper</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">293</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">79</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">102</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">119</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">46</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">33</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-skenes-rf-roc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-skenes-rf-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-skenes-rf-roc-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-skenes-rf-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;16: ROC Curves for Paul Skenes’s Random Forest Model
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.pred_class</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Split-Finger</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Sweeper</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.2949647</td>
+<td style="text-align: right;">0.0128817</td>
+<td style="text-align: right;">0.0355619</td>
+<td style="text-align: right;">0.0001111</td>
+<td style="text-align: right;">0.6548583</td>
+<td style="text-align: right;">0.0016222</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.2719865</td>
+<td style="text-align: right;">0.0004000</td>
+<td style="text-align: right;">0.0084702</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.7191433</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.4354344</td>
+<td style="text-align: right;">0.0004444</td>
+<td style="text-align: right;">0.0010679</td>
+<td style="text-align: right;">0.0001250</td>
+<td style="text-align: right;">0.5618854</td>
+<td style="text-align: right;">0.0010429</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.4609619</td>
+<td style="text-align: right;">0.0003333</td>
+<td style="text-align: right;">0.0002000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5383619</td>
+<td style="text-align: right;">0.0001429</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.8005146</td>
+<td style="text-align: right;">0.1994854</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2970877</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6808163</td>
+<td style="text-align: right;">0.0220960</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3607440</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5064730</td>
+<td style="text-align: right;">0.1327829</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0020000</td>
+<td style="text-align: right;">0.0004722</td>
+<td style="text-align: right;">0.0051357</td>
+<td style="text-align: right;">0.3128290</td>
+<td style="text-align: right;">0.0061615</td>
+<td style="text-align: right;">0.6314115</td>
+<td style="text-align: right;">0.0419901</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0001000</td>
+<td style="text-align: right;">0.0028770</td>
+<td style="text-align: right;">0.0010179</td>
+<td style="text-align: right;">0.2015008</td>
+<td style="text-align: right;">0.0001000</td>
+<td style="text-align: right;">0.6961484</td>
+<td style="text-align: right;">0.0982560</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3012762</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6791595</td>
+<td style="text-align: right;">0.0195643</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.9182829</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0817171</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.7602188</td>
+<td style="text-align: right;">0.0003333</td>
+<td style="text-align: right;">0.0018206</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2373273</td>
+<td style="text-align: right;">0.0003000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.8321465</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0001250</td>
+<td style="text-align: right;">0.1672285</td>
+<td style="text-align: right;">0.0005000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.5525214</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4474786</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.8848373</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.1151627</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.5948607</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4051393</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.6811115</td>
+<td style="text-align: right;">0.0003333</td>
+<td style="text-align: right;">0.0004222</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3181329</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.7802294</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2197706</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.6048060</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3951940</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.6323952</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3676048</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0.0001000</td>
+<td style="text-align: right;">0.9105413</td>
+<td style="text-align: right;">0.0616317</td>
+<td style="text-align: right;">0.0108075</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0161944</td>
+<td style="text-align: right;">0.0007250</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.7545373</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.1631873</td>
+<td style="text-align: right;">0.0822754</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<section id="k-nearest-neighbors-knn" class="level2">
+<h2 class="anchored" data-anchor-id="k-nearest-neighbors-knn">K-Nearest Neighbors (KNN)</h2>
+<section id="cristopher-sánchez-3" class="level3">
+<h3 class="anchored" data-anchor-id="cristopher-sánchez-3">Cristopher Sánchez</h3>
+<div class="grid">
+<div class="g-col-6">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - K-Nearest Neighbors Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9985570</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">0.0007215</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0013091</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">0.0006366</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9985183</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">0.0009802</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-6">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - K-Nearest Neighbors Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">355</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">291</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">127</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-sanchez-knn-roc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sanchez-knn-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-sanchez-knn-roc-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sanchez-knn-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;17: ROC Curves for Cristopher Sánchez’s K-Nearest Neighbors Model
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="tarik-skubal-3" class="level3">
+<h3 class="anchored" data-anchor-id="tarik-skubal-3">Tarik Skubal</h3>
+<div class="grid">
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - K-Nearest Neighbors Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9961862</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0014725</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0033155</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0010260</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9995922</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0002725</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - K-Nearest Neighbors Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">236</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">103</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">243</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">184</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">24</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-skubal-knn-roc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-skubal-knn-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-skubal-knn-roc-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-skubal-knn-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;18: ROC Curves for Tarik Skubal’s K-Nearest Neighbors Model
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.pred_class</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">NA</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">:----------</td>
+<td style="text-align: left;">:-----------</td>
+<td style="text-align: right;">---------------------:</td>
+<td style="text-align: right;">------------:</td>
+<td style="text-align: right;">--------------:</td>
+<td style="text-align: right;">------------:</td>
+<td style="text-align: right;">---------------:</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="paul-skenes-3" class="level3">
+<h3 class="anchored" data-anchor-id="paul-skenes-3">Paul Skenes</h3>
+<div class="grid">
+<div class="g-col-4">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - K-Nearest Neighbors Performance Metrics</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.9576813</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0033312</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: right;">0.0320728</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0018269</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.9945525</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0007173</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="g-col-8">
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - K-Nearest Neighbors Confusion Matrix</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Split-Finger</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sweeper</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">293</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">78</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">102</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">121</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">61</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">33</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">33</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-skenes-knn-roc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-skenes-knn-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="pitch_classification_with_tidymodels_files/figure-html/fig-skenes-knn-roc-1.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-skenes-knn-roc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;19: ROC Curves for Paul Skenes’s K-Nearest Neighbors Model
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 31 × 9
+   pitch_name      .pred_class     `.pred_4-Seam Fastball` .pred_Changeup
+   &lt;fct&gt;           &lt;fct&gt;                             &lt;dbl&gt;          &lt;dbl&gt;
+ 1 4-Seam Fastball Sinker                            0.438          0    
+ 2 4-Seam Fastball Sinker                            0.329          0    
+ 3 4-Seam Fastball Sinker                            0.377          0    
+ 4 4-Seam Fastball Sinker                            0.398          0    
+ 5 Changeup        Sinker                            0              0.320
+ 6 Split-Finger    Changeup                          0              0.670
+ 7 Sweeper         Slider                            0              0    
+ 8 Sweeper         Slider                            0              0    
+ 9 Sweeper         Slider                            0              0    
+10 Sinker          4-Seam Fastball                   0.829          0    
+11 Sinker          4-Seam Fastball                   0.552          0    
+12 Sinker          4-Seam Fastball                   0.921          0    
+13 Sinker          4-Seam Fastball                   0.575          0    
+14 Sinker          4-Seam Fastball                   0.603          0    
+15 Sinker          4-Seam Fastball                   0.771          0    
+16 Sinker          4-Seam Fastball                   0.588          0    
+17 Slider          Changeup                          0              1    
+18 Slider          Sweeper                           0              0    
+19 Slider          Sweeper                           0              0    
+20 Slider          Sweeper                           0              0    
+21 Slider          Sweeper                           0              0    
+22 Slider          Sweeper                           0              0    
+23 Slider          Sweeper                           0              0    
+24 Slider          Sweeper                           0              0    
+25 Slider          Sweeper                           0              0    
+26 Slider          Sweeper                           0              0    
+27 Slider          Sweeper                           0              0    
+28 Slider          Sweeper                           0              0    
+29 Slider          Sweeper                           0              0    
+30 Slider          Sweeper                           0              0    
+31 Slider          Curveball                         0              0    
+# ℹ 5 more variables: `.pred_Split-Finger` &lt;dbl&gt;, .pred_Sweeper &lt;dbl&gt;,
+#   .pred_Sinker &lt;dbl&gt;, .pred_Slider &lt;dbl&gt;, .pred_Curveball &lt;dbl&gt;</code></pre>
+</div>
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">pitch_name</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.pred_class</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_4-Seam Fastball</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Changeup</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Split-Finger</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Sweeper</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Sinker</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Slider</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">.pred_Curveball</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.4384905</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5615095</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.3288938</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6711062</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.3766104</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6233896</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.3977709</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6022291</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3202953</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0013038</td>
+<td style="text-align: right;">0.5246015</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.1537995</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Split-Finger</td>
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6696681</td>
+<td style="text-align: right;">0.3303319</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4956500</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5043500</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3871166</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6128834</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: left;">Slider</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3364556</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6635444</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.8286520</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.1713480</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.5520612</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4479388</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.9208919</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0791081</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.5751769</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4248231</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.6030378</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3969622</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.7710947</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2289053</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sinker</td>
+<td style="text-align: left;">4-Seam Fastball</td>
+<td style="text-align: right;">0.5876524</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4123476</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Changeup</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">1.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.8270676</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.1729324</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5777708</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4222292</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5097145</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4902855</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5154264</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4845736</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.7891654</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2108346</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5890617</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4109383</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6021233</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3978767</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.7801751</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2198249</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.5228901</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.4771099</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6238012</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3761988</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.7814578</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2185422</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.6656097</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2233761</td>
+<td style="text-align: right;">0.1110142</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Sweeper</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.9160665</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0839335</td>
+<td style="text-align: right;">0.0000000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slider</td>
+<td style="text-align: left;">Curveball</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.3095876</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.2276118</td>
+<td style="text-align: right;">0.4628006</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<section id="comparison" class="level2">
+<h2 class="anchored" data-anchor-id="comparison">Comparison</h2>
+<section id="cristopher-sánchez-4" class="level3">
+<h3 class="anchored" data-anchor-id="cristopher-sánchez-4">Cristopher Sánchez</h3>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Cristopher Sánchez - Performance Metrics Comparison</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">wflow_id</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.config</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">preproc</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">model</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.estimator</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9991323</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0005785</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0008671</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0005777</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9988917</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0007549</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9986994</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0006622</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0019631</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0006022</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9998235</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0000954</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9985570</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">0.0007215</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0013091</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">0.0006366</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9985183</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">0.0009802</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="tarik-skubal-4" class="level3">
+<h3 class="anchored" data-anchor-id="tarik-skubal-4">Tarik Skubal</h3>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Tarik Skubal - Performance Metrics Comparison</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">wflow_id</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.config</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">preproc</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">model</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.estimator</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9881153</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0023483</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0117121</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0022855</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9959984</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0007580</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9974522</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0009362</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0031814</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0005304</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9999649</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0000312</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9961862</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0014725</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0033155</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0010260</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9995922</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0002725</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="paul-skenes-4" class="level3">
+<h3 class="anchored" data-anchor-id="paul-skenes-4">Paul Skenes</h3>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-hover table-condensed caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption>Paul Skenes - Performance Metrics Comparison</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">wflow_id</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.config</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">preproc</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">model</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.metric</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">.estimator</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">mean</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">n</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">std_err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9532646</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0032177</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0434634</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0027117</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_1_decision_tree</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">decision_tree</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9853129</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0029258</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9728386</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0023310</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0221492</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0016532</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_2_rand_forest</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">rand_forest</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9991710</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0002267</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.9576813</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0033312</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">brier_class</td>
+<td style="text-align: left;">multiclass</td>
+<td style="text-align: right;">0.0320728</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0018269</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">recipe_3_nearest_neighbor</td>
+<td style="text-align: left;">pre0_mod0_post0</td>
+<td style="text-align: left;">recipe</td>
+<td style="text-align: left;">nearest_neighbor</td>
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: left;">hand_till</td>
+<td style="text-align: right;">0.9945525</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0007173</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+</section>
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<script>videojs(video_shortcode_videojs_video1);</script>
+<script>videojs(video_shortcode_videojs_video2);</script>
+<script>videojs(video_shortcode_videojs_video3);</script>
+<script>videojs(video_shortcode_videojs_video4);</script>
+<script>videojs(video_shortcode_videojs_video5);</script>
+<script>videojs(video_shortcode_videojs_video6);</script>
+
+
+
+
+<script src="site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
